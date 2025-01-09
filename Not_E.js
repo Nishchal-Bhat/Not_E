@@ -255,8 +255,6 @@ function draw() {
 
     // set background color
     if (updateNeeded == true) {
-        console.log('updating');
-
         background(backgroundColor[0], backgroundColor[1], backgroundColor[2]);
 
         // update UI elements
@@ -679,9 +677,7 @@ function finishStroke() {
     if (strokeArr.length > 0 && strokeArr[strokeArr.length - 1].status == 'drawing') {
         strokeArr[strokeArr.length - 1].status = 'drawn';
         if (strokeArr[strokeArr.length - 1].arr.length > 30) {
-            console.log('before', strokeArr[strokeArr.length - 1].arr.length);
             strokeArr[strokeArr.length - 1].arr = reducearr(strokeArr[strokeArr.length - 1].arr);
-            console.log('after', strokeArr[strokeArr.length - 1].arr.length);
         }
     }
 
