@@ -11,19 +11,19 @@ Not_E implements clean, user-friendly keyboard shortcuts, all present on the lef
 You can use it online here : https://nishchal-bhat.github.io/Not_E/
 
 Or download the [Not_E.html](./Not_E.html) file.<br>
-This is a standalone file that you can open in your browser and use like any other application
+This is a standalone file that you can open in your browser and use like any other application.
 
 ---
 ## Features
-- Supports drawing and erasing with the stylus
-- Also lets you add text and images
-- Keyboard shortcuts for all essential actions
-- Undo/redo for easy corrections
+- Supports drawing and erasing with the stylus.
+- Also lets you add text and images.
+- Keyboard shortcuts for all essential actions.
+- Undo/redo for easy corrections.
 - You can save your canvas in either a .jpg or .json format. <br>
 Choosing .jpg will save an image of your entire canvas.<br>
 Choosing .json will create a save file on your device. This save file can be loaded up subsequently.
 
-The app also has a few ~~bugs~~...~~features~~...quirks 🤭. Please read [Instructions](https://github.com/Nishchal-Bhat/pages/tree/main?tab=readme-ov-file#instructions)
+The app also has a few ~~bugs~~...~~features~~...quirks 🤭. Please read [Instructions](https://github.com/Nishchal-Bhat/Not_E?tab=readme-ov-file#instructions)
 
 ---
 ## Keyboard Shortcuts : 
@@ -67,4 +67,4 @@ This issue does not occur when erasing in eraser mode, as it does not require ho
 
 - Once drawn, entities (lines, text, etc.) cannot be selected, moved, recolored, or in any way modified. You can only erase them.
 
-- In text mode, there is no cursor you can move to select or edit different characters of the text, you will have to erase and retype typos
+- In text mode, there is no cursor you can move to select or edit different characters of the text, you will have to erase and retype typos.
