@@ -38,7 +38,7 @@ let currentHeight = window.innerHeight + 100;
 // UI elements
 let colorDisplay;
 let lineModeButton;
-let strokeBodeButton;
+let strokeModeButton;
 let textModeButton;
 let eraseModeButton;
 let removeModeButton;
@@ -48,12 +48,17 @@ let dashStyleButton;
 let undoButton;
 let redoButton;
 
-let buttonHeight = window.innerHeight / 15;
-// let buttonHeight = window.innerHeight / 20;
+let screenratio = window.innerWidth / window.innerHeight;
 
-let buttonWidth = window.innerWidth / 25;
+let heightdenominator = 16;
+let widthdenominator = heightdenominator * screenratio;
+
+let buttonHeight = window.innerHeight / heightdenominator;
+
+let buttonWidth = window.innerWidth / widthdenominator;
+
 let buttonFont = buttonWidth / 2.1;
-let spacing = buttonWidth/2.5;
+let spacing = buttonWidth / 2.5;
 
 // disable right click and spacebar scroll
 document.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -84,6 +89,7 @@ function setup() {
             if (e.deltaY > 0) {
                 currentHeight += 100;
                 resizeCanvas(currentWidth, currentHeight);
+                updateNeeded = true;
             }
         }
 
@@ -91,6 +97,7 @@ function setup() {
             if (e.deltaX > 0) {
                 currentWidth += 100;
                 resizeCanvas(currentWidth, currentHeight);
+                updateNeeded = true;
             }
         }
 
@@ -121,31 +128,32 @@ function setup() {
     });
 
     // make UI elements
-    let topbar = createDiv().position(0, 0).size(buttonPos(19, 7), buttonHeight).style('background-color:rgb(70,70,120)');
+    let topbar = createDiv().position(0, 0).size(buttonPos(20, 8), buttonHeight).style('background-color:rgb(70,70,120)');
 
-    colorDisplay = createColorPicker('white').position(0, 0).size(buttonWidth, buttonHeight);
+    colorDisplay = createColorPicker('white').position(0, 0).size(buttonWidth, buttonHeight).attribute('title', "set brush color");
     colorDisplay.input(() => {
         let value = hexToRgb(colorDisplay.value());
         currentColor = [value.r, value.g, value.b];
     });
     let colorbutton = createButton('OK').position(buttonPos(1, 0), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont / 1.5}px`);
 
-    lineModeButton = createButton('📏').position(buttonPos(2, 1), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`);
+    lineModeButton = createButton('📏').position(buttonPos(2, 1), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "line mode")
+        ;
     lineModeButton.mouseClicked(() => {
         isRightMouseDown = false;
         mode = 'line'; currentMode = 'line';
     });
-    strokeBodeButton = createButton('🖊').position(buttonPos(3, 1), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`);
-    strokeBodeButton.mouseClicked(() => {
+    strokeModeButton = createButton('🖊').position(buttonPos(3, 1), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "freehand mode");
+    strokeModeButton.mouseClicked(() => {
         isRightMouseDown = false;
         mode = 'stroke'; currentMode = 'stroke';
     });
-    textModeButton = createButton('₸').position(buttonPos(4, 1), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`);
+    textModeButton = createButton('₸').position(buttonPos(4, 1), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "text mode");
     textModeButton.mouseClicked(() => {
         isRightMouseDown = false;
         mode = 'text'; currentMode = 'text';
     });
-    let picButton = createButton('🖼').position(buttonPos(5, 1), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`);
+    let picButton = createButton('🖼').position(buttonPos(5, 1), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "insert image");
     picButton.mouseClicked(() => {
         mode = 'image';
         input = createFileInput(addImage);
@@ -153,18 +161,18 @@ function setup() {
         input.elt.click();
     });
 
-    eraseModeButton = createButton('🧽').position(buttonPos(6, 2), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`);
+    eraseModeButton = createButton('🧽').position(buttonPos(6, 2), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "erase mode one");
     eraseModeButton.mouseClicked(() => {
         mode = mode == 'erase' ? currentMode : 'erase';
     });
-    removeModeButton = createButton('X').position(buttonPos(7, 2), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`);
+    removeModeButton = createButton('X').position(buttonPos(7, 2), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "remove text and images");
     removeModeButton.mouseClicked(() => {
         removeMode == true ? removeMode = false : removeMode = true; updateNeeded = true;
     });
 
-    let strokeMinusButton = createButton(' ⎼ ').position(buttonPos(8, 3), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`);
+    let strokeMinusButton = createButton(' ⎼ ').position(buttonPos(8, 3), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "decrease stroke size");
     strokeWeightDisplay = createDiv('4').position(buttonPos(9, 3), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).style('background-color : rgb(170,170,170)');
-    let strokePlusButton = createButton(' + ').position(buttonPos(10, 3), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`);
+    let strokePlusButton = createButton(' + ').position(buttonPos(10, 3), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "increase stroke size");
     strokeMinusButton.mouseClicked(() => {
         if (isRightMouseDown == false) {
             if (mode == 'erase') {
@@ -202,17 +210,17 @@ function setup() {
         }
     });
 
-    solidStyleButton = createButton('⎯').position(buttonPos(11, 4), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style('line-height: 50px');
-    dashStyleButton = createButton('---').position(buttonPos(12, 4), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style('line-height: 50px');
+    solidStyleButton = createButton('⎯').position(buttonPos(11, 4), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "solid strokes");
+    dashStyleButton = createButton('---').position(buttonPos(12, 4), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "dashed strokes");
     solidStyleButton.mouseClicked(() => { currentStrokeStyle = 'solid'; });
     dashStyleButton.mouseClicked(() => { currentStrokeStyle = 'dash'; });
 
-    undoButton = createButton('↶').position(buttonPos(13, 5), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`);
+    undoButton = createButton('↶').position(buttonPos(13, 5), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "undo");
     undoButton.mouseClicked(() => { undo(); });
-    redoButton = createButton('↷').position(buttonPos(14, 5), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`);
+    redoButton = createButton('↷').position(buttonPos(14, 5), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "redo");
     redoButton.mouseClicked(() => { redo(); });
 
-    let saveButton = createButton('💾').position(buttonPos(15, 6), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`);
+    let saveButton = createButton('💾').position(buttonPos(15, 6), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "save canvas");
     saveButton.mouseClicked(() => {
         let name = window.prompt('enter filename', 'myNotes');
         if (saveModeButton.value() == 'jpg') {
@@ -241,23 +249,26 @@ function setup() {
         }
 
     });
-    let saveModeButton = createSelect().position(buttonPos(16, 6), 0).size(buttonWidth, buttonHeight / 2).style(`font-size:${buttonFont / 2}px`);
+    let saveModeButton = createSelect().position(buttonPos(16, 6), 0).size(buttonWidth, buttonHeight / 2).style(`font-size:${buttonFont / 2}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "set save format");
     saveModeButton.option('jpg');
     saveModeButton.option('json');
-    let openButton = createButton('📁').position(buttonPos(17, 6), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`);
+    let openButton = createButton('📁').position(buttonPos(17, 6), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "open save file");
     openButton.mouseClicked(() => {
         let input = createFileInput(openJSON);
         input.hide();
         input.elt.click();
     });
 
-    let bgColorDisplay = createColorPicker('black').position(buttonPos(18, 7), 0).size(buttonWidth, buttonHeight);
+    let bgColorDisplay = createColorPicker('black').position(buttonPos(18, 7), 0).size(buttonWidth, buttonHeight).attribute('title', "set background");
     let bgcolorbutton = createButton('OK').position(buttonPos(19, 7), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont / 1.5}px`);
     bgColorDisplay.input(() => {
         let value = hexToRgb(bgColorDisplay.value());
         backgroundColor = [value.r, value.g, value.b];
         updateNeeded = true;
     });
+
+    let helpbutton = createButton('❓').position(buttonPos(20, 8), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', 'help');
+    helpbutton.mouseClicked(() => { window.open('https://github.com/Nishchal-Bhat/Not_E?tab=readme-ov-file#instructions', '_blank'); });
 }
 
 function draw() {
@@ -283,7 +294,7 @@ function draw() {
                 strokeWeightDisplay.html(currentStrokeWeight);
             }
             lineModeButton.style('background-color : revert');
-            strokeBodeButton.style('background-color : revert');
+            strokeModeButton.style('background-color : revert');
             textModeButton.style('background-color : revert');
             eraseModeButton.style('background-color : revert');
             removeModeButton.style('background-color : revert');
@@ -296,7 +307,7 @@ function draw() {
                 lineModeButton.style('background-color : rgb(170,170,170)');
             }
             if (currentMode == 'stroke') {
-                strokeBodeButton.style('background-color : rgb(170,170,170)');
+                strokeModeButton.style('background-color : rgb(170,170,170)');
             }
             if (currentMode == 'text') {
                 textModeButton.style('background-color : rgb(170,170,170)');
@@ -1021,7 +1032,7 @@ function showText(_text) {
         push();
         noFill();
         drawingContext.setLineDash([10, 10]);
-        rect(_text.x0 - 5, _text.y0 - 5, _text.width + 5, _text.height + 5);
+        rect(_text.x0 - 5, _text.y0 - 5, _text.width + 10, _text.height + 10);
         pop();
     }
 }
@@ -1032,7 +1043,7 @@ function showImage(_img) {
         stroke(255, 0, 0);
         noFill();
         drawingContext.setLineDash([10, 10]);
-        rect(_img.x0 - 5, _img.y0 - 5, _img.width + 5, _img.height + 5);
+        rect(_img.x0 - 5, _img.y0 - 5, _img.width + 10, _img.height + 10);
         pop();
     }
 
@@ -1090,7 +1101,7 @@ function undo() {
         }
     }
     catch {
-        console.log('error undoing');
+        window.alert('error undoing');
     }
 }
 
@@ -1136,33 +1147,42 @@ function redo() {
         }
     }
     catch {
-        console.log('error redoing');
+        window.alert('error redoing');
     }
 }
 
 function openJSON(file) {
-    let json = file.data;
+    try {
+        let json = file.data;
 
-    newimages = [];
-    for (let i of json.images) {
-        let imagecontent = createImg(i.data).hide();
-        newimages.push({
-            content: imagecontent,
-            data: i.data,
-            width: i.width,
-            height: i.height,
-            x0: i.x0,
-            y0: i.y0,
-            status: i.status
-        });
+        newimages = [];
+        for (let i of json.images) {
+            let imagecontent = createImg(i.data).hide();
+            newimages.push({
+                content: imagecontent,
+                data: i.data,
+                width: i.width,
+                height: i.height,
+                x0: i.x0,
+                y0: i.y0,
+                status: i.status
+            });
+        }
+
+        resizeCanvas(json.canvassize.width, json.canvassize.height);
+        backgroundColor = json.backgroundColor;
+        lineArr = json.lines;
+        strokeArr = json.strokes;
+        textArr = json.texts;
+        imgArr = newimages;
+
+        updateNeeded = true;
+    }
+    catch {
+        window.alert("not a valid save file");
+
     }
 
-    resizeCanvas(json.canvassize.width, json.canvassize.height);
-    backgroundColor = json.backgroundColor;
-    lineArr = json.lines;
-    strokeArr = json.strokes;
-    textArr = json.texts;
-    imgArr = newimages;
 }
 
 function buttonPos(buttons, spaces) {

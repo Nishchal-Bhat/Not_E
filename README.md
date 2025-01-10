@@ -19,6 +19,7 @@ This is a standalone file that you can open in your browser and use like any oth
 - Also lets you add text and images.
 - Keyboard shortcuts for all essential actions.
 - Undo/redo for easy corrections.
+- Infinite scrolling canvas.
 - You can save your canvas in either a .jpg or .json format. <br>
 Choosing .jpg will save an image of your entire canvas.<br>
 Choosing .json will create a save file on your device. This save file can be loaded up subsequently.
