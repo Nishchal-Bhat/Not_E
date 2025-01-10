@@ -1,3 +1,5 @@
+let isDeviceTouch = false;
+
 // entity arrays
 let lineArr = [];
 let strokeArr = [];
@@ -12,6 +14,7 @@ let erasedStuffArr = [];
 // mouse state vars
 let isLeftMouseDown = false;
 let isRightMouseDown = false;
+let isfingerdown = false;
 
 // drawing vars
 let currentStrokeWeight = 4;
@@ -20,14 +23,15 @@ let eraserSize = 30;
 let currentColor = [255, 255, 255];
 let backgroundColor = [0, 0, 0];
 let currentTextSize = 30;
-let updateNeeded = false;
+let updateNeeded = true;
 
 // mode vars
 let mode = 'stroke';
 let currentMode = 'stroke';
 let removeMode = false;
 
-// canvas size
+// canvas
+let canvas;
 let currentWidth = window.innerWidth + 100;
 let currentHeight = window.innerHeight + 100;
 
@@ -45,9 +49,11 @@ let undoButton;
 let redoButton;
 
 let buttonHeight = window.innerHeight / 15;
+// let buttonHeight = window.innerHeight / 20;
+
 let buttonWidth = window.innerWidth / 25;
-let buttonFont = buttonWidth / 1.7;
-let spacing = 20;
+let buttonFont = buttonWidth / 2.1;
+let spacing = buttonWidth/2.5;
 
 // disable right click and spacebar scroll
 document.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -58,8 +64,16 @@ window.addEventListener('keydown', function (e) {
 });
 
 function setup() {
+    if (navigator.userAgent.match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile/i)) {
+        isDeviceTouch = true;
+    }
+    else {
+        isDeviceTouch = false;
+    }
+
     // make canvas
-    let canvas = createCanvas(currentWidth, currentHeight).position(0, buttonHeight);
+    canvas = createCanvas(currentWidth, currentHeight).position(0, buttonHeight);
+    canvas.style('touch-action : none');
 
     // set background color
     background(backgroundColor[0], backgroundColor[1], backgroundColor[2]);
@@ -85,21 +99,23 @@ function setup() {
 
     // click detection for text and image
     canvas.mouseClicked(() => {
-        if (mode == 'text' && removeMode == false) {
-            if (textArr.length == 0) {
-                addText();
-            } else if (textArr[textArr.length - 1].status != 'moving') {
-                addText();
-            } else if (textArr[textArr.length - 1].status == 'moving') {
-                finishText();
+        if (isDeviceTouch == false) {
+            if (mode == 'text' && removeMode == false) {
+                if (textArr.length == 0) {
+                    addText();
+                } else if (textArr[textArr.length - 1].status != 'moving' && textArr[textArr.length - 1].status != 'drawing') {
+                    addText();
+                } else if (textArr[textArr.length - 1].status == 'moving') {
+                    finishText();
+                }
             }
-        }
 
-        if (mode == 'image') {
-            if (imgArr.length > 0 && imgArr[imgArr.length - 1].status == 'moving') {
-                imgArr[imgArr.length - 1].status = 'drawn';
-                mode = currentMode;
-                updateNeeded = true;
+            if (mode == 'image') {
+                if (imgArr.length > 0 && imgArr[imgArr.length - 1].status == 'moving') {
+                    imgArr[imgArr.length - 1].status = 'drawn';
+                    mode = currentMode;
+                    updateNeeded = true;
+                }
             }
         }
     });
@@ -143,7 +159,7 @@ function setup() {
     });
     removeModeButton = createButton('X').position(buttonPos(7, 2), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`);
     removeModeButton.mouseClicked(() => {
-        removeMode == true ? removeMode = false : removeMode = true;
+        removeMode == true ? removeMode = false : removeMode = true; updateNeeded = true;
     });
 
     let strokeMinusButton = createButton(' ⎼ ').position(buttonPos(8, 3), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`);
@@ -258,178 +274,288 @@ function draw() {
         background(backgroundColor[0], backgroundColor[1], backgroundColor[2]);
 
         // update UI elements
-        if (isRightMouseDown == true || mode == 'erase') {
-            strokeWeightDisplay.html(eraserSize);
-        } else if (mode == 'text') {
-            strokeWeightDisplay.html(currentTextSize);
-        } else {
-            strokeWeightDisplay.html(currentStrokeWeight);
-        }
-        lineModeButton.style('background-color : revert');
-        strokeBodeButton.style('background-color : revert');
-        textModeButton.style('background-color : revert');
-        eraseModeButton.style('background-color : revert');
-        removeModeButton.style('background-color : revert');
-        solidStyleButton.style('background-color : revert');
-        dashStyleButton.style('background-color : revert');
-        undoButton.style('background-color : revert');
-        redoButton.style('background-color : revert');
+        {
+            if (isRightMouseDown == true || mode == 'erase') {
+                strokeWeightDisplay.html(eraserSize);
+            } else if (mode == 'text') {
+                strokeWeightDisplay.html(currentTextSize);
+            } else {
+                strokeWeightDisplay.html(currentStrokeWeight);
+            }
+            lineModeButton.style('background-color : revert');
+            strokeBodeButton.style('background-color : revert');
+            textModeButton.style('background-color : revert');
+            eraseModeButton.style('background-color : revert');
+            removeModeButton.style('background-color : revert');
+            solidStyleButton.style('background-color : revert');
+            dashStyleButton.style('background-color : revert');
+            undoButton.style('background-color : revert');
+            redoButton.style('background-color : revert');
 
-        if (currentMode == 'line') {
-            lineModeButton.style('background-color : rgb(170,170,170)');
-        }
-        if (currentMode == 'stroke') {
-            strokeBodeButton.style('background-color : rgb(170,170,170)');
-        }
-        if (currentMode == 'text') {
-            textModeButton.style('background-color : rgb(170,170,170)');
-        }
-        if (isRightMouseDown == true || mode == 'erase') {
-            eraseModeButton.style('background-color : rgb(170,170,170)');
-        }
-        if (removeMode == true) {
-            removeModeButton.style('background-color : rgb(170,170,170)');
-        }
-        if (undoArr.length == 0) {
-            undoButton.style('background-color : rgb(170,170,170)');
-        }
-        if (redoArr.length == 0) {
-            redoButton.style('background-color : rgb(170,170,170)');
-        }
-        if (currentStrokeStyle == 'solid') {
-            solidStyleButton.style('background-color : rgb(170,170,170)');
-        }
-        if (currentStrokeStyle == 'dash') {
-            dashStyleButton.style('background-color : rgb(170,170,170)');
-        }
-
-        // move current image
-        if (mode == 'image' && imgArr.length > 0 && imgArr[imgArr.length - 1].status == 'moving') {
-            imgArr[imgArr.length - 1].x0 = mouseX;
-            imgArr[imgArr.length - 1].y0 = mouseY;
-            // draw dotted rectangle around image
-            push();
-            stroke(255, 0, 0);
-            noFill();
-            drawingContext.setLineDash([10, 10]);
-            rect(imgArr[imgArr.length - 1].x0 - 5, imgArr[imgArr.length - 1].y0 - 5, imgArr[imgArr.length - 1].width + 5, imgArr[imgArr.length - 1].height + 5);
-            pop();
+            if (currentMode == 'line') {
+                lineModeButton.style('background-color : rgb(170,170,170)');
+            }
+            if (currentMode == 'stroke') {
+                strokeBodeButton.style('background-color : rgb(170,170,170)');
+            }
+            if (currentMode == 'text') {
+                textModeButton.style('background-color : rgb(170,170,170)');
+            }
+            if (isRightMouseDown == true || mode == 'erase') {
+                eraseModeButton.style('background-color : rgb(170,170,170)');
+            }
+            if (removeMode == true) {
+                removeModeButton.style('background-color : rgb(170,170,170)');
+            }
+            if (undoArr.length == 0) {
+                undoButton.style('background-color : rgb(170,170,170)');
+            }
+            if (redoArr.length == 0) {
+                redoButton.style('background-color : rgb(170,170,170)');
+            }
+            if (currentStrokeStyle == 'solid') {
+                solidStyleButton.style('background-color : rgb(170,170,170)');
+            }
+            if (currentStrokeStyle == 'dash') {
+                dashStyleButton.style('background-color : rgb(170,170,170)');
+            }
         }
 
-        // show all images
-        for (let _img of imgArr) {
-            showImage(_img);
-        }
+        if (isDeviceTouch == true) {
+            let mouseX = touches.length > 0 ? touches[0].x : -1000;
+            let mouseY = touches.length > 0 ? touches[0].y : -1000;
 
-        // move current text
-        if (mode == 'text' && textArr.length > 0 && textArr[textArr.length - 1].status == 'moving') {
-            textArr[textArr.length - 1].x0 = mouseX;
-            textArr[textArr.length - 1].y0 = mouseY;
-            // draw dotted rectangle around text
-            push();
-            noFill();
-            drawingContext.setLineDash([10, 10]);
-            rect(textArr[textArr.length - 1].x0 - 5, textArr[textArr.length - 1].y0 - 5, textArr[textArr.length - 1].width + 5, textArr[textArr.length - 1].height + 5);
-            pop();
-        }
-        // draw all texts
-        for (let _text of textArr) {
-            showText(_text);
-        }
-
-        // draw all lines
-        for (let _line of lineArr) {
-            showLine(_line);
-        }
-
-        // draw all strokes
-        for (let _stroke of strokeArr) {
-            showStroke(_stroke);
-        }
-
-        // erasing lines and strokes
-        if (mode == 'erase') {
-            // draw eraser UI
-            strokeWeight(1);
-            stroke(255, 255, 255, 100);
-            fill(255, 255, 255, 100);
-            circle(mouseX, mouseY, eraserSize * 2);
-        }
-        if (isRightMouseDown == true) {
-            // draw eraser UI
-            strokeWeight(1);
-            stroke(255, 255, 255, 100);
-            fill(255, 255, 255, 100);
-            circle(mouseX, mouseY, eraserSize * 2);
-            for (let _stroke of strokeArr) {
-                for (let point of _stroke.arr) {
-                    if (dist(point.x, point.y, mouseX, mouseY) < eraserSize) {
-                        let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
-                        erasedStuffArr.push(erased[0]);
-                        undoArr.push('erase stroke');
-                        redoArr = [];
-                        break;
-                    }
-                }
+            // show all images
+            for (let _img of imgArr) {
+                showImage(_img);
             }
 
+            // draw all texts
+            for (let _text of textArr) {
+                showText(_text);
+            }
+
+            // draw all lines
             for (let _line of lineArr) {
-                for (let point of _line.arr) {
-                    if (dist(point.x, point.y, mouseX, mouseY) < eraserSize) {
-                        let erased = lineArr.splice(lineArr.indexOf(_line), 1);
-                        erasedStuffArr.push(erased[0]);
-                        undoArr.push('erase line');
-                        redoArr = [];
-                        break;
+                showLine(_line);
+            }
+
+            // draw all strokes
+            for (let _stroke of strokeArr) {
+                showStroke(_stroke);
+            }
+
+            // erasing lines and strokes
+            if (mode == 'erase') {
+                if (isfingerdown) {
+                    // draw eraser UI
+                    strokeWeight(1);
+                    stroke(255, 255, 255, 100);
+                    fill(255, 255, 255, 100);
+                    circle(mouseX, mouseY, eraserSize * 2);
+                    for (let _stroke of strokeArr) {
+                        for (let point of _stroke.arr) {
+                            if (dist(point.x, point.y, mouseX, mouseY) < eraserSize) {
+                                let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                erasedStuffArr.push(erased[0]);
+                                undoArr.push('erase stroke');
+                                redoArr = [];
+                                break;
+                            }
+                        }
+                    }
+
+                    for (let _line of lineArr) {
+                        for (let point of _line.arr) {
+                            if (dist(point.x, point.y, mouseX, mouseY) < eraserSize) {
+                                let erased = lineArr.splice(lineArr.indexOf(_line), 1);
+                                erasedStuffArr.push(erased[0]);
+                                undoArr.push('erase line');
+                                redoArr = [];
+                                break;
+                            }
+                        }
                     }
                 }
             }
-        }
-        // removing texts and images
-        else if (removeMode == true) {
-            // draw remove UI
-            strokeWeight(4);
-            stroke(255, 0, 0, 150);
-            fill(255, 0, 0, 150);
-            line(mouseX - 30, mouseY - 30, mouseX + 30, mouseY + 30);
-            line(mouseX - 30, mouseY + 30, mouseX + 30, mouseY - 30);
+            // removing texts and images
+            else if (removeMode == true) {
+                if (isfingerdown == true) {
+                    // draw remove UI
+                    strokeWeight(4);
+                    stroke(255, 0, 0, 150);
+                    fill(255, 0, 0, 150);
+                    line(mouseX - 30, mouseY - 30, mouseX + 30, mouseY + 30);
+                    line(mouseX - 30, mouseY + 30, mouseX + 30, mouseY - 30);
 
-            if (isLeftMouseDown == true) {
-                for (let _img of imgArr) {
-                    if (_img.x0 < mouseX && mouseX < _img.x0 + _img.width && _img.y0 < mouseY && mouseY < _img.y0 + _img.height) {
-                        let erased = imgArr.splice(imgArr.indexOf(_img), 1);
-                        erasedStuffArr.push(erased[0]);
-                        undoArr.push('erase image');
-                        redoArr = [];
+                    for (let _img of imgArr) {
+                        if (_img.x0 < mouseX && mouseX < _img.x0 + _img.width && _img.y0 < mouseY && mouseY < _img.y0 + _img.height) {
+                            let erased = imgArr.splice(imgArr.indexOf(_img), 1);
+                            erasedStuffArr.push(erased[0]);
+                            undoArr.push('erase image');
+                            redoArr = [];
+                        }
                     }
-                }
 
-                for (let _text of textArr) {
-                    let width = _text.width;
-                    let height = _text.height;
-                    if (_text.x0 < mouseX && mouseX < _text.x0 + width && _text.y0 < mouseY && mouseY < _text.y0 + height) {
-                        let erased = textArr.splice(textArr.indexOf(_text), 1);
-                        erasedStuffArr.push(erased[0]);
-                        undoArr.push('erase text');
-                        redoArr = [];
+                    for (let _text of textArr) {
+                        let width = _text.width;
+                        let height = _text.height;
+                        if (_text.x0 < mouseX && mouseX < _text.x0 + width && _text.y0 < mouseY && mouseY < _text.y0 + height) {
+                            let erased = textArr.splice(textArr.indexOf(_text), 1);
+                            erasedStuffArr.push(erased[0]);
+                            undoArr.push('erase text');
+                            redoArr = [];
+                        }
                     }
                 }
             }
-        }
-        // drawing current line and stroke
-        else if (isLeftMouseDown == true) {
-            // draw current line
-            if (mode == 'line') {
-                if (lineArr.length > 0 && lineArr[lineArr.length - 1].status == 'drawing') {
-                    lineArr[lineArr.length - 1].x1 = mouseX;
-                    lineArr[lineArr.length - 1].y1 = mouseY;
+            // drawing current line and stroke
+            else if (isfingerdown == true) {
+                // draw current line
+                if (mode == 'line') {
+                    if (lineArr.length > 0 && lineArr[lineArr.length - 1].status == 'drawing') {
+                        lineArr[lineArr.length - 1].x1 = mouseX;
+                        lineArr[lineArr.length - 1].y1 = mouseY;
+                    }
+                }
+
+                // draw current stroke
+                if (mode == 'stroke') {
+                    if (strokeArr.length > 0 && strokeArr[strokeArr.length - 1].status == 'drawing') {
+                        strokeArr[strokeArr.length - 1].arr.push({ x: mouseX, y: mouseY });
+                    }
                 }
             }
+        } else {
 
-            // draw current stroke
-            if (mode == 'stroke') {
-                if (strokeArr.length > 0 && strokeArr[strokeArr.length - 1].status == 'drawing') {
-                    strokeArr[strokeArr.length - 1].arr.push({ x: mouseX, y: mouseY });
+            // move current image
+            if (mode == 'image' && imgArr.length > 0 && imgArr[imgArr.length - 1].status == 'moving') {
+                imgArr[imgArr.length - 1].x0 = mouseX;
+                imgArr[imgArr.length - 1].y0 = mouseY;
+                // draw dotted rectangle around image
+                push();
+                stroke(255, 0, 0);
+                noFill();
+                drawingContext.setLineDash([10, 10]);
+                rect(imgArr[imgArr.length - 1].x0 - 5, imgArr[imgArr.length - 1].y0 - 5, imgArr[imgArr.length - 1].width + 5, imgArr[imgArr.length - 1].height + 5);
+                pop();
+            }
+
+            // show all images
+            for (let _img of imgArr) {
+                showImage(_img);
+            }
+
+            // move current text
+            if (mode == 'text' && textArr.length > 0 && textArr[textArr.length - 1].status == 'moving') {
+                textArr[textArr.length - 1].x0 = mouseX;
+                textArr[textArr.length - 1].y0 = mouseY;
+                // draw dotted rectangle around text
+                push();
+                noFill();
+                drawingContext.setLineDash([10, 10]);
+                rect(textArr[textArr.length - 1].x0 - 5, textArr[textArr.length - 1].y0 - 5, textArr[textArr.length - 1].width + 5, textArr[textArr.length - 1].height + 5);
+                pop();
+            }
+            // draw all texts
+            for (let _text of textArr) {
+                showText(_text);
+            }
+
+            // draw all lines
+            for (let _line of lineArr) {
+                showLine(_line);
+            }
+
+            // draw all strokes
+            for (let _stroke of strokeArr) {
+                showStroke(_stroke);
+            }
+
+            // erasing lines and strokes
+            if (mode == 'erase') {
+                // draw eraser UI
+                strokeWeight(1);
+                stroke(255, 255, 255, 100);
+                fill(255, 255, 255, 100);
+                circle(mouseX, mouseY, eraserSize * 2);
+            }
+            if (isRightMouseDown == true) {
+                // draw eraser UI
+                strokeWeight(1);
+                stroke(255, 255, 255, 100);
+                fill(255, 255, 255, 100);
+                circle(mouseX, mouseY, eraserSize * 2);
+                for (let _stroke of strokeArr) {
+                    for (let point of _stroke.arr) {
+                        if (dist(point.x, point.y, mouseX, mouseY) < eraserSize) {
+                            let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                            erasedStuffArr.push(erased[0]);
+                            undoArr.push('erase stroke');
+                            redoArr = [];
+                            break;
+                        }
+                    }
+                }
+
+                for (let _line of lineArr) {
+                    for (let point of _line.arr) {
+                        if (dist(point.x, point.y, mouseX, mouseY) < eraserSize) {
+                            let erased = lineArr.splice(lineArr.indexOf(_line), 1);
+                            erasedStuffArr.push(erased[0]);
+                            undoArr.push('erase line');
+                            redoArr = [];
+                            break;
+                        }
+                    }
+                }
+            }
+            // removing texts and images
+            else if (removeMode == true) {
+                // draw remove UI
+                strokeWeight(4);
+                stroke(255, 0, 0, 150);
+                fill(255, 0, 0, 150);
+                line(mouseX - 30, mouseY - 30, mouseX + 30, mouseY + 30);
+                line(mouseX - 30, mouseY + 30, mouseX + 30, mouseY - 30);
+
+                if (isLeftMouseDown == true) {
+                    for (let _img of imgArr) {
+                        if (_img.x0 < mouseX && mouseX < _img.x0 + _img.width && _img.y0 < mouseY && mouseY < _img.y0 + _img.height) {
+                            let erased = imgArr.splice(imgArr.indexOf(_img), 1);
+                            erasedStuffArr.push(erased[0]);
+                            undoArr.push('erase image');
+                            redoArr = [];
+                        }
+                    }
+
+                    for (let _text of textArr) {
+                        let width = _text.width;
+                        let height = _text.height;
+                        if (_text.x0 < mouseX && mouseX < _text.x0 + width && _text.y0 < mouseY && mouseY < _text.y0 + height) {
+                            let erased = textArr.splice(textArr.indexOf(_text), 1);
+                            erasedStuffArr.push(erased[0]);
+                            undoArr.push('erase text');
+                            redoArr = [];
+                        }
+                    }
+                }
+            }
+            // drawing current line and stroke
+            else if (isLeftMouseDown == true) {
+                // draw current line
+                if (mode == 'line') {
+                    if (lineArr.length > 0 && lineArr[lineArr.length - 1].status == 'drawing') {
+                        lineArr[lineArr.length - 1].x1 = mouseX;
+                        lineArr[lineArr.length - 1].y1 = mouseY;
+                    }
+                }
+
+                // draw current stroke
+                if (mode == 'stroke') {
+                    if (strokeArr.length > 0 && strokeArr[strokeArr.length - 1].status == 'drawing') {
+                        strokeArr[strokeArr.length - 1].arr.push({ x: mouseX, y: mouseY });
+                    }
                 }
             }
         }
@@ -438,36 +564,111 @@ function draw() {
 }
 
 function mousePressed(event) {
-    // only detect presses on canvas
-    if (event.srcElement.id == 'defaultCanvas0') {
-        // fresh left click
-        if (mouseButton == LEFT && isLeftMouseDown == false && isRightMouseDown == false && removeMode == false) {
-            // add new line
-            if (mode == 'line') {
-                addLine();
-                updateNeeded = true;
-            }
-            // add new stroke
-            if (mode == 'stroke') {
-                addStroke();
-                updateNeeded = true;
-            }
-        }
+    if (isDeviceTouch == false) {
+        // only detect presses on canvas
+        if (event.srcElement.id == 'defaultCanvas0') {
+            // fresh left click
+            if (mouseButton == LEFT && isLeftMouseDown == false && isRightMouseDown == false && removeMode == false) {
+                // add new line
+                if (mode == 'line') {
+                    addLine();
+                    updateNeeded = true;
+                }
+                // add new stroke
+                if (mode == 'stroke') {
+                    addStroke();
+                    updateNeeded = true;
+                }
 
-        // update mouse state vars
-        if (event.button == 0) {
-            isLeftMouseDown = true;
-            if (mode == 'erase') {
+                if (mode == 'text') {
+                    if (textArr.length > 0 && textArr[textArr.length - 1].status == 'drawing' && textArr[textArr.length - 1].content.length > 0) {
+                        finishText();
+                    }
+                }
+            }
+
+            // update mouse state vars
+            if (event.button == 0) {
+                isLeftMouseDown = true;
+                if (mode == 'erase') {
+                    isRightMouseDown = true;
+                }
+            }
+            if (event.button == 2) {
                 isRightMouseDown = true;
             }
-        }
-        if (event.button == 2) {
-            isRightMouseDown = true;
         }
     }
 }
 
 function mouseReleased(event) {
+    if (isDeviceTouch == false) {
+        // update mouse state vars
+        if (event.button == 0) {
+            isLeftMouseDown = false;
+            if (mode == 'erase') {
+                isRightMouseDown = false;
+                updateNeeded = true;
+            }
+        }
+        if (event.button == 2) {
+            isRightMouseDown = false;
+        }
+        // finish current line
+        if (mode == 'line' && isLeftMouseDown == false) {
+            finishLine();
+        }
+        // finish curernt stroke
+        if (mode == 'stroke' && isLeftMouseDown == false) {
+            finishStroke();
+        }
+        updateNeeded = true;
+    }
+}
+
+function touchStarted(event) {
+    // only detect presses on canvas
+    if (event.target.id == 'defaultCanvas0') {
+        // add new line
+        if (mode == 'line') {
+            addLine();
+            updateNeeded = true;
+        }
+        // add new stroke
+        if (mode == 'stroke') {
+            addStroke();
+            updateNeeded = true;
+        }
+
+        if (mode == 'text' && removeMode == false) {
+            if (textArr.length == 0) {
+                addText();
+            } else if (textArr[textArr.length - 1].status == 'drawing') {
+                finishText();
+            }
+            else if (textArr[textArr.length - 1].status != 'moving') {
+                addText();
+            }
+        }
+
+        if (mode == 'image' && removeMode == false) {
+            if (imgArr.length == 0) {
+                addImage();
+            } else if (imgArr[imgArr.length - 1].status != 'moving') {
+                addImage();
+            }
+            // if (imgArr.length > 0 && imgArr[imgArr.length - 1].status == 'moving') {
+            //     imgArr[imgArr.length - 1].status = 'drawn';
+            //     mode = currentMode;
+            //     updateNeeded = true;
+            // }
+        }
+
+        isfingerdown = true;
+    }
+}
+
+function touchEnded() {
     // update mouse state vars
     if (event.button == 0) {
         isLeftMouseDown = false;
@@ -488,6 +689,36 @@ function mouseReleased(event) {
     if (mode == 'stroke' && isLeftMouseDown == false) {
         finishStroke();
         updateNeeded = true;
+    }
+
+    if (mode == 'text' && removeMode == false) {
+        if (textArr[textArr.length - 1].status == 'moving') {
+            finishText();
+        }
+    }
+
+    if (mode == 'image' && removeMode == false) {
+        if (imgArr[imgArr.length - 1].status == 'moving') {
+            finishImage();
+        }
+    }
+    updateNeeded = true;
+}
+
+function touchMoved() {
+    if (isDeviceTouch == true) {
+        // move current image
+        if (mode == 'image' && imgArr.length > 0 && imgArr[imgArr.length - 1].status == 'moving') {
+            imgArr[imgArr.length - 1].x0 = touches[0].x;
+            imgArr[imgArr.length - 1].y0 = touches[0].y;
+        }
+
+        // move current text
+        if (mode == 'text' && textArr.length > 0 && textArr[textArr.length - 1].status == 'moving') {
+            textArr[textArr.length - 1].x0 = touches[0].x;
+            textArr[textArr.length - 1].y0 = touches[0].y;
+
+        }
     }
 }
 
@@ -632,6 +863,10 @@ function keyPressed() {
 }
 
 function addLine() {
+    if (isDeviceTouch == true) {
+        let mouseX = touches[0].x;
+        let mouseY = touches[0].y;
+    }
     let line = {
         x0: mouseX, y0: mouseY, x1: mouseX, y1: mouseY,
         status: 'drawing',
@@ -660,13 +895,19 @@ function finishLine() {
 }
 
 function addStroke() {
-    let stroke = {
+    if (isDeviceTouch == true) {
+        let mouseX = touches[0].x;
+        let mouseY = touches[0].y;
+    }
+    let stroke = {};
+    stroke = {
         arr: [{ x: mouseX, y: mouseY }],
         color: currentColor,
         status: 'drawing',
         strokeWeight: currentStrokeWeight,
         strokeStyle: currentStrokeStyle
     };
+
     strokeArr.push(stroke);
     undoArr.push('stroke');
     redoArr = [];
@@ -684,6 +925,10 @@ function finishStroke() {
 }
 
 function addText() {
+    if (isDeviceTouch == true) {
+        let mouseX = touches[0].x;
+        let mouseY = touches[0].y;
+    }
     let text = {
         x0: mouseX, y0: mouseY, status: 'drawing',
         content: "",
@@ -705,6 +950,12 @@ function finishText() {
     if (textArr.length > 0 && textArr[textArr.length - 1].status == 'drawing') {
         textArr[textArr.length - 1].status = 'moving';
     }
+    updateNeeded = true;
+}
+
+function finishImage() {
+    imgArr[imgArr.length - 1].status = 'drawn';
+    mode = currentMode;
     updateNeeded = true;
 }
 
@@ -765,7 +1016,8 @@ function showText(_text) {
     textAlign(LEFT, TOP);
     text(_text.content, _text.x0, _text.y0);
 
-    if (_text.status == 'drawing') {
+    // draw dotted rectangle around text
+    if (_text.status == 'drawing' || _text.status == 'moving') {
         push();
         noFill();
         drawingContext.setLineDash([10, 10]);
@@ -774,6 +1026,16 @@ function showText(_text) {
     }
 }
 function showImage(_img) {
+    // draw dotted rectangle around image
+    if (_img.status == 'moving') {
+        push();
+        stroke(255, 0, 0);
+        noFill();
+        drawingContext.setLineDash([10, 10]);
+        rect(_img.x0 - 5, _img.y0 - 5, _img.width + 5, _img.height + 5);
+        pop();
+    }
+
     image(_img.content, _img.x0, _img.y0, _img.width, _img.height);
 }
 
