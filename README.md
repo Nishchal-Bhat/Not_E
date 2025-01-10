@@ -60,6 +60,8 @@ The app also has a few ~~bugs~~...~~features~~...quirks 🤭. Please read [Instr
 ---
 ## Instructions
 
+- Usage on touchscreen devices is not recommended. Scrolling and text input does not work on touchscreen devices.
+ 
 - When erasing with the stylus button held down, it is advised to hover over the tablet instead of pressing down. Depending on how your tablet registers clicks, releasing the stylus button while pressed down on the tablet may unintentionally trigger a new stroke. This behavior is entirely dependent on how your tablet handles input events and cannot be resolved through code(at least not in a browser environment).<br>
 This issue does not occur when erasing in eraser mode, as it does not require holding down the stylus button.
 
@@ -67,4 +69,5 @@ This issue does not occur when erasing in eraser mode, as it does not require ho
 
 - Once drawn, entities (lines, text, etc.) cannot be selected, moved, recolored, or in any way modified. You can only erase them.
 
-- In text mode, there is no cursor you can move to select or edit different characters of the text, you will have to erase and retype typos.
+- In text mode, there is no cursor you can move to select or edit different characters of the text, you will have to erase and retype typos.<br>
+Pressing Enter confirms you are done typing and prompts you to drag and position the text entity. To insert a new line, use Shift + Enter
