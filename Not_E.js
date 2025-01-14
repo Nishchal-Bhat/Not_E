@@ -1,5 +1,7 @@
 let isDeviceTouch = false;
 
+let capacity = 50;
+
 // entity arrays
 let lineArr = [];
 let strokeArr = [];
@@ -14,7 +16,7 @@ let erasedStuffArr = [];
 // mouse state vars
 let isLeftMouseDown = false;
 let isRightMouseDown = false;
-let isfingerdown = false;
+let isFingerDown = false;
 
 // drawing vars
 let currentStrokeWeight = 4;
@@ -24,6 +26,8 @@ let currentColor = [255, 255, 255];
 let backgroundColor = [0, 0, 0];
 let currentTextSize = 30;
 let updateNeeded = true;
+let strokeID = 0;
+let eraserCell = [0, 0];
 
 // mode vars
 let mode = 'stroke';
@@ -34,6 +38,21 @@ let removeMode = false;
 let canvas;
 let currentWidth = window.innerWidth + 100;
 let currentHeight = window.innerHeight + 100;
+
+let grid = {
+    length: 0.7 * eraserSize,
+    matrix: []
+};
+
+// scrapped
+let quadtree = {
+    startx: 0, endx: currentWidth,
+    starty: 0, endy: currentHeight,
+    subdivided: false,
+    points: [],
+    children: {},
+    name: [0]
+};
 
 // UI elements
 let colorDisplay;
@@ -62,11 +81,15 @@ let spacing = buttonWidth / 2.5;
 
 // disable right click and spacebar scroll
 document.addEventListener('contextmenu', (e) => e.preventDefault());
-window.addEventListener('keydown', function (e) {
+document.addEventListener('keydown', function (e) {
     if (e.code == 'Space' && e.target == document.body) {
         e.preventDefault();
     }
 });
+
+window.onbeforeunload = function () {
+    return "";
+};
 
 function setup() {
     if (navigator.userAgent.match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile/i)) {
@@ -269,6 +292,8 @@ function setup() {
 
     let helpbutton = createButton('❓').position(buttonPos(20, 8), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', 'help');
     helpbutton.mouseClicked(() => { window.open('https://github.com/Nishchal-Bhat/Not_E?tab=readme-ov-file#instructions', '_blank'); });
+
+    populateGrid();
 }
 
 function draw() {
@@ -276,7 +301,7 @@ function draw() {
     if (strokeArr.length > 0 && strokeArr[strokeArr.length - 1].status == 'drawing') { updateNeeded = true; }
     if (textArr.length > 0 && (textArr[textArr.length - 1].status == 'drawing' || textArr[textArr.length - 1].status == 'moving')) { updateNeeded = true; }
     if (imgArr.length > 0 && imgArr[imgArr.length - 1].status == 'moving') { updateNeeded = true; }
-    if (mode == 'erase') { updateNeeded = true; }
+    if (mode == 'erase' && isDeviceTouch == false) { updateNeeded = true; }
     if (removeMode == true) { updateNeeded = true; }
     if (isRightMouseDown == true) { updateNeeded = true; }
 
@@ -358,23 +383,174 @@ function draw() {
 
             // erasing lines and strokes
             if (mode == 'erase') {
-                if (isfingerdown) {
+                if (isFingerDown) {
+                    let coordy = Math.floor(mouseY / grid.length);
+                    let coordx = Math.floor(mouseX / grid.length);
+
+                    eraserCell = { y: coordy, x: coordx };
+
                     // draw eraser UI
                     strokeWeight(1);
                     stroke(255, 255, 255, 100);
                     fill(255, 255, 255, 100);
                     circle(mouseX, mouseY, eraserSize * 2);
-                    for (let _stroke of strokeArr) {
-                        for (let point of _stroke.arr) {
-                            if (dist(point.x, point.y, mouseX, mouseY) < eraserSize) {
+                    // erase strokes
+
+                    let beforexexists = eraserCell.x != 0;
+                    let beforeyexists = eraserCell.y != 0;
+                    let afterxexists = eraserCell.x != grid.matrix[0].length - 1;
+                    let afteryexists = eraserCell.x != grid.matrix.length - 1;
+
+                    // 0
+                    for (let _point of grid.matrix[eraserCell.y][eraserCell.x].points) {
+                        if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                            let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                            if (_stroke) {
                                 let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
                                 erasedStuffArr.push(erased[0]);
                                 undoArr.push('erase stroke');
                                 redoArr = [];
+                                populateGrid();
                                 break;
                             }
                         }
                     }
+                    if (beforexexists == true) {
+                        // W
+                        for (let _point of grid.matrix[eraserCell.y][eraserCell.x - 1].points) {
+
+                            if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                                let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                                if (_stroke) {
+                                    let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                    erasedStuffArr.push(erased[0]);
+                                    undoArr.push('erase stroke');
+                                    redoArr = [];
+                                    populateGrid();
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (beforeyexists == true) {
+                            // n
+                            for (let _point of grid.matrix[eraserCell.y - 1][eraserCell.x].points) {
+
+                                if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                                    let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                                    if (_stroke) {
+                                        let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                        erasedStuffArr.push(erased[0]);
+                                        undoArr.push('erase stroke');
+                                        redoArr = [];
+                                        populateGrid();
+                                        break;
+                                    }
+                                }
+                            }
+                            // nw
+                            for (let _point of grid.matrix[eraserCell.y - 1][eraserCell.x - 1].points) {
+
+                                if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                                    let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                                    if (_stroke) {
+                                        let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                        erasedStuffArr.push(erased[0]);
+                                        undoArr.push('erase stroke');
+                                        redoArr = [];
+                                        populateGrid();
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (afteryexists == true) {
+                            // s
+                            for (let _point of grid.matrix[eraserCell.y + 1][eraserCell.x].points) {
+
+                                if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                                    let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                                    if (_stroke) {
+                                        let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                        erasedStuffArr.push(erased[0]);
+                                        undoArr.push('erase stroke');
+                                        redoArr = [];
+                                        populateGrid();
+                                        break;
+                                    }
+                                }
+                            }
+                            // sw
+                            for (let _point of grid.matrix[eraserCell.y + 1][eraserCell.x - 1].points) {
+
+                                if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                                    let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                                    if (_stroke) {
+                                        let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                        erasedStuffArr.push(erased[0]);
+                                        undoArr.push('erase stroke');
+                                        redoArr = [];
+                                        populateGrid();
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (afterxexists == true) {
+                        // E
+                        for (let _point of grid.matrix[eraserCell.y][eraserCell.x + 1].points) {
+
+                            if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                                let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                                if (_stroke) {
+                                    let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                    erasedStuffArr.push(erased[0]);
+                                    undoArr.push('erase stroke');
+                                    redoArr = [];
+                                    populateGrid();
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (beforeyexists == true) {
+                            // NE
+                            for (let _point of grid.matrix[eraserCell.y - 1][eraserCell.x + 1].points) {
+
+                                if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                                    let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                                    if (_stroke) {
+                                        let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                        erasedStuffArr.push(erased[0]);
+                                        undoArr.push('erase stroke');
+                                        redoArr = [];
+                                        populateGrid();
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (afteryexists == true) {
+                            // SE
+                            for (let _point of grid.matrix[eraserCell.y + 1][eraserCell.x + 1].points) {
+                                if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                                    let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                                    if (_stroke) {
+                                        let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                        erasedStuffArr.push(erased[0]);
+                                        undoArr.push('erase stroke');
+                                        redoArr = [];
+                                        populateGrid();
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
 
                     for (let _line of lineArr) {
                         for (let point of _line.arr) {
@@ -391,7 +567,7 @@ function draw() {
             }
             // removing texts and images
             else if (removeMode == true) {
-                if (isfingerdown == true) {
+                if (isFingerDown == true) {
                     // draw remove UI
                     strokeWeight(4);
                     stroke(255, 0, 0, 150);
@@ -421,7 +597,7 @@ function draw() {
                 }
             }
             // drawing current line and stroke
-            else if (isfingerdown == true) {
+            else if (isFingerDown == true) {
                 // draw current line
                 if (mode == 'line') {
                     if (lineArr.length > 0 && lineArr[lineArr.length - 1].status == 'drawing') {
@@ -433,7 +609,7 @@ function draw() {
                 // draw current stroke
                 if (mode == 'stroke') {
                     if (strokeArr.length > 0 && strokeArr[strokeArr.length - 1].status == 'drawing') {
-                        strokeArr[strokeArr.length - 1].arr.push({ x: mouseX, y: mouseY });
+                        strokeArr[strokeArr.length - 1].arr.push({ x: mouseX, y: mouseY, id: strokeID });
                     }
                 }
             }
@@ -443,13 +619,6 @@ function draw() {
             if (mode == 'image' && imgArr.length > 0 && imgArr[imgArr.length - 1].status == 'moving') {
                 imgArr[imgArr.length - 1].x0 = mouseX;
                 imgArr[imgArr.length - 1].y0 = mouseY;
-                // draw dotted rectangle around image
-                push();
-                stroke(255, 0, 0);
-                noFill();
-                drawingContext.setLineDash([10, 10]);
-                rect(imgArr[imgArr.length - 1].x0 - 5, imgArr[imgArr.length - 1].y0 - 5, imgArr[imgArr.length - 1].width + 5, imgArr[imgArr.length - 1].height + 5);
-                pop();
             }
 
             // show all images
@@ -461,12 +630,6 @@ function draw() {
             if (mode == 'text' && textArr.length > 0 && textArr[textArr.length - 1].status == 'moving') {
                 textArr[textArr.length - 1].x0 = mouseX;
                 textArr[textArr.length - 1].y0 = mouseY;
-                // draw dotted rectangle around text
-                push();
-                noFill();
-                drawingContext.setLineDash([10, 10]);
-                rect(textArr[textArr.length - 1].x0 - 5, textArr[textArr.length - 1].y0 - 5, textArr[textArr.length - 1].width + 5, textArr[textArr.length - 1].height + 5);
-                pop();
             }
             // draw all texts
             for (let _text of textArr) {
@@ -490,25 +653,177 @@ function draw() {
                 stroke(255, 255, 255, 100);
                 fill(255, 255, 255, 100);
                 circle(mouseX, mouseY, eraserSize * 2);
+
             }
             if (isRightMouseDown == true) {
+                let coordy = Math.floor(mouseY / grid.length);
+                let coordx = Math.floor(mouseX / grid.length);
+
+                eraserCell = { y: coordy, x: coordx };
+
                 // draw eraser UI
                 strokeWeight(1);
                 stroke(255, 255, 255, 100);
                 fill(255, 255, 255, 100);
                 circle(mouseX, mouseY, eraserSize * 2);
-                for (let _stroke of strokeArr) {
-                    for (let point of _stroke.arr) {
-                        if (dist(point.x, point.y, mouseX, mouseY) < eraserSize) {
+                // erase strokes
+
+                let beforexexists = eraserCell.x != 0;
+                let beforeyexists = eraserCell.y != 0;
+                let afterxexists = eraserCell.x != grid.matrix[0].length - 1;
+                let afteryexists = eraserCell.x != grid.matrix.length - 1;
+
+                // 0
+                for (let _point of grid.matrix[eraserCell.y][eraserCell.x].points) {
+                    if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                        let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                        if (_stroke) {
                             let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
                             erasedStuffArr.push(erased[0]);
                             undoArr.push('erase stroke');
                             redoArr = [];
+                            populateGrid();
                             break;
                         }
                     }
                 }
+                if (beforexexists == true) {
+                    // W
+                    for (let _point of grid.matrix[eraserCell.y][eraserCell.x - 1].points) {
 
+                        if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                            let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                            if (_stroke) {
+                                let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                erasedStuffArr.push(erased[0]);
+                                undoArr.push('erase stroke');
+                                redoArr = [];
+                                populateGrid();
+                                break;
+                            }
+                        }
+                    }
+
+                    if (beforeyexists == true) {
+                        // n
+                        for (let _point of grid.matrix[eraserCell.y - 1][eraserCell.x].points) {
+
+                            if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                                let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                                if (_stroke) {
+                                    let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                    erasedStuffArr.push(erased[0]);
+                                    undoArr.push('erase stroke');
+                                    redoArr = [];
+                                    populateGrid();
+                                    break;
+                                }
+                            }
+                        }
+                        // nw
+                        for (let _point of grid.matrix[eraserCell.y - 1][eraserCell.x - 1].points) {
+
+                            if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                                let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                                if (_stroke) {
+                                    let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                    erasedStuffArr.push(erased[0]);
+                                    undoArr.push('erase stroke');
+                                    redoArr = [];
+                                    populateGrid();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (afteryexists == true) {
+                        // s
+                        for (let _point of grid.matrix[eraserCell.y + 1][eraserCell.x].points) {
+
+                            if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                                let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                                if (_stroke) {
+                                    let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                    erasedStuffArr.push(erased[0]);
+                                    undoArr.push('erase stroke');
+                                    redoArr = [];
+                                    populateGrid();
+                                    break;
+                                }
+                            }
+                        }
+                        // sw
+                        for (let _point of grid.matrix[eraserCell.y + 1][eraserCell.x - 1].points) {
+
+                            if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                                let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                                if (_stroke) {
+                                    let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                    erasedStuffArr.push(erased[0]);
+                                    undoArr.push('erase stroke');
+                                    redoArr = [];
+                                    populateGrid();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (afterxexists == true) {
+                    // E
+                    for (let _point of grid.matrix[eraserCell.y][eraserCell.x + 1].points) {
+
+                        if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                            let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                            if (_stroke) {
+                                let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                erasedStuffArr.push(erased[0]);
+                                undoArr.push('erase stroke');
+                                redoArr = [];
+                                populateGrid();
+                                break;
+                            }
+                        }
+                    }
+
+                    if (beforeyexists == true) {
+                        // NE
+                        for (let _point of grid.matrix[eraserCell.y - 1][eraserCell.x + 1].points) {
+
+                            if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                                let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                                if (_stroke) {
+                                    let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                    erasedStuffArr.push(erased[0]);
+                                    undoArr.push('erase stroke');
+                                    redoArr = [];
+                                    populateGrid();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (afteryexists == true) {
+                        // SE
+                        for (let _point of grid.matrix[eraserCell.y + 1][eraserCell.x + 1].points) {
+                            if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
+                                let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
+                                if (_stroke) {
+                                    let erased = strokeArr.splice(strokeArr.indexOf(_stroke), 1);
+                                    erasedStuffArr.push(erased[0]);
+                                    undoArr.push('erase stroke');
+                                    redoArr = [];
+                                    populateGrid();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // erase lines
                 for (let _line of lineArr) {
                     for (let point of _line.arr) {
                         if (dist(point.x, point.y, mouseX, mouseY) < eraserSize) {
@@ -565,7 +880,7 @@ function draw() {
                 // draw current stroke
                 if (mode == 'stroke') {
                     if (strokeArr.length > 0 && strokeArr[strokeArr.length - 1].status == 'drawing') {
-                        strokeArr[strokeArr.length - 1].arr.push({ x: mouseX, y: mouseY });
+                        strokeArr[strokeArr.length - 1].arr.push({ x: mouseX, y: mouseY, id: strokeID });
                     }
                 }
             }
@@ -638,82 +953,79 @@ function mouseReleased(event) {
 }
 
 function touchStarted(event) {
-    // only detect presses on canvas
-    if (event.target.id == 'defaultCanvas0') {
-        // add new line
-        if (mode == 'line') {
-            addLine();
-            updateNeeded = true;
-        }
-        // add new stroke
-        if (mode == 'stroke') {
-            addStroke();
-            updateNeeded = true;
-        }
-
-        if (mode == 'text' && removeMode == false) {
-            if (textArr.length == 0) {
-                addText();
-            } else if (textArr[textArr.length - 1].status == 'drawing') {
-                finishText();
+    if (isDeviceTouch == true) {
+        // only detect presses on canvas
+        if (event.target.id == 'defaultCanvas0') {
+            // add new line
+            if (mode == 'line') {
+                addLine();
+                updateNeeded = true;
             }
-            else if (textArr[textArr.length - 1].status != 'moving') {
-                addText();
+            // add new stroke
+            if (mode == 'stroke') {
+                addStroke();
+                updateNeeded = true;
             }
-        }
 
-        if (mode == 'image' && removeMode == false) {
-            if (imgArr.length == 0) {
-                addImage();
-            } else if (imgArr[imgArr.length - 1].status != 'moving') {
-                addImage();
+            if (mode == 'text' && removeMode == false) {
+                if (textArr.length == 0) {
+                    addText();
+                } else if (textArr[textArr.length - 1].status == 'drawing') {
+                    finishText();
+                }
+                else if (textArr[textArr.length - 1].status != 'moving') {
+                    addText();
+                }
             }
-            // if (imgArr.length > 0 && imgArr[imgArr.length - 1].status == 'moving') {
-            //     imgArr[imgArr.length - 1].status = 'drawn';
-            //     mode = currentMode;
-            //     updateNeeded = true;
-            // }
-        }
 
-        isfingerdown = true;
+            if (mode == 'image' && removeMode == false) {
+                if (imgArr.length == 0) {
+                    addImage();
+                } else if (imgArr[imgArr.length - 1].status != 'moving') {
+                    addImage();
+                }
+                // if (imgArr.length > 0 && imgArr[imgArr.length - 1].status == 'moving') {
+                //     imgArr[imgArr.length - 1].status = 'drawn';
+                //     mode = currentMode;
+                //     updateNeeded = true;
+                // }
+            }
+
+            isFingerDown = true;
+        }
+        updateNeeded = true;
     }
 }
 
 function touchEnded() {
-    // update mouse state vars
-    if (event.button == 0) {
-        isLeftMouseDown = false;
-        if (mode == 'erase') {
-            isRightMouseDown = false;
+    if (isDeviceTouch == true) {
+        // update mouse state vars
+        isFingerDown = false;
+
+        // finish current line
+        if (mode == 'line') {
+            finishLine();
             updateNeeded = true;
         }
-    }
-    if (event.button == 2) {
-        isRightMouseDown = false;
-    }
-    // finish current line
-    if (mode == 'line' && isLeftMouseDown == false) {
-        finishLine();
+        // finish curernt stroke
+        if (mode == 'stroke') {
+            finishStroke();
+            updateNeeded = true;
+        }
+
+        if (mode == 'text' && removeMode == false) {
+            if (textArr[textArr.length - 1].status == 'moving') {
+                finishText();
+            }
+        }
+
+        if (mode == 'image' && removeMode == false) {
+            if (imgArr[imgArr.length - 1].status == 'moving') {
+                finishImage();
+            }
+        }
         updateNeeded = true;
     }
-    // finish curernt stroke
-    if (mode == 'stroke' && isLeftMouseDown == false) {
-        finishStroke();
-        updateNeeded = true;
-    }
-
-    if (mode == 'text' && removeMode == false) {
-        if (textArr[textArr.length - 1].status == 'moving') {
-            finishText();
-        }
-    }
-
-    if (mode == 'image' && removeMode == false) {
-        if (imgArr[imgArr.length - 1].status == 'moving') {
-            finishImage();
-        }
-    }
-    updateNeeded = true;
 }
 
 function touchMoved() {
@@ -730,6 +1042,8 @@ function touchMoved() {
             textArr[textArr.length - 1].y0 = touches[0].y;
 
         }
+
+        updateNeeded = true;
     }
 }
 
@@ -912,9 +1226,10 @@ function addStroke() {
     }
     let stroke = {};
     stroke = {
-        arr: [{ x: mouseX, y: mouseY }],
+        arr: [{ x: mouseX, y: mouseY, id: strokeID }],
         color: currentColor,
         status: 'drawing',
+        id: strokeID,
         strokeWeight: currentStrokeWeight,
         strokeStyle: currentStrokeStyle
     };
@@ -929,8 +1244,10 @@ function finishStroke() {
     if (strokeArr.length > 0 && strokeArr[strokeArr.length - 1].status == 'drawing') {
         strokeArr[strokeArr.length - 1].status = 'drawn';
         if (strokeArr[strokeArr.length - 1].arr.length > 30) {
-            strokeArr[strokeArr.length - 1].arr = reducearr(strokeArr[strokeArr.length - 1].arr);
+            strokeArr[strokeArr.length - 1].arr = reduceArr(strokeArr[strokeArr.length - 1].arr);
         }
+        strokeID++;
+        populateGrid();
     }
 
 }
@@ -1103,6 +1420,8 @@ function undo() {
     catch {
         window.alert('error undoing');
     }
+
+    populateGrid();
 }
 
 function redo() {
@@ -1149,6 +1468,8 @@ function redo() {
     catch {
         window.alert('error redoing');
     }
+
+    populateGrid();
 }
 
 function openJSON(file) {
@@ -1189,25 +1510,25 @@ function buttonPos(buttons, spaces) {
     return buttonWidth * buttons + spacing * spaces;
 }
 
-function reducearr(arr) {
+function reduceArr(arr) {
     // array to store redundant points indices
-    let deletearr = [];
+    let deleteArr = [];
 
     for (let point = 1; point < arr.length - 1; point++) {
         // calculate number of remaining points
         let numberOfZeroes = 0;
         for (let index in arr) {
-            if (deletearr.includes(Number(index))) { numberOfZeroes++; }
+            if (deleteArr.includes(Number(index))) { numberOfZeroes++; }
         }
-        let remainingpoints = arr.length - numberOfZeroes;
+        let remainingPoints = arr.length - numberOfZeroes;
         // only continue marking redundant points if more than 30 points exist
-        if (remainingpoints > 30) {
+        if (remainingPoints > 30) {
             let vector1 = { x: arr[point - 1].x - arr[point].x, y: arr[point - 1].y - arr[point].y };
             let vector2 = { x: arr[point + 1].x - arr[point].x, y: arr[point + 1].y - arr[point].y };
 
             // identity and mark redundant points
             if (Math.abs(angle(vector1, vector2)) > 175) {
-                deletearr.push(point);
+                deleteArr.push(point);
             }
         } else {
             break;
@@ -1216,7 +1537,7 @@ function reducearr(arr) {
 
     // set redundant points to zero
     for (let i in arr) {
-        if (deletearr.includes(Number(i))) {
+        if (deleteArr.includes(Number(i))) {
             arr[i] = 0;
         }
     }
@@ -1233,4 +1554,154 @@ function angle(vector1, vector2) {
     let mag2 = Math.sqrt(vector2.x ** 2 + vector2.y ** 2);
 
     return (Math.acos(dotproduct / (mag1 * mag2))) * (180 / Math.PI);
+}
+
+function populateGrid() {
+    grid = {
+        length: 0.7 * eraserSize,
+        matrix: []
+    };
+
+    makeGrid();
+
+    for (let _stroke of strokeArr) {
+        for (let _point of _stroke.arr) {
+            let coordY = Math.floor(_point.y / grid.length);
+            let coordX = Math.floor(_point.x / grid.length);
+
+            grid.matrix[coordY][coordX].points.push(_point);
+        }
+    }
+}
+
+function makeGrid() {
+    for (let y = 0; y < currentHeight; y += grid.length) {
+        grid.matrix.push([]);
+        for (let x = 0; x < currentWidth; x += grid.length) {
+            grid.matrix[grid.matrix.length - 1].push({ x: x, y: y, points: [] });
+        }
+    }
+}
+
+// scrapped 
+function populatequadtree() {
+    for (let _stroke of strokeArr) {
+        for (let _point of _stroke.arr) {
+            insertpoint(_point, quadtree);
+        }
+    }
+}
+
+function insertpoint(_point, _tree) {
+    if (_tree.points.length < capacity && _tree.subdivided == false) {
+        _tree.points.push(_point);
+    } else {
+        if (_tree.subdivided == false) {
+            subdivide(_tree);
+        }
+
+        if (_point.x > (_tree.startx + _tree.endx) / 2) {
+            if (_point.y > (_tree.starty + _tree.endy) / 2) {
+                insertpoint(_point, _tree.children.q4);
+            } else {
+                insertpoint(_point, _tree.children.q1);
+            }
+        } else {
+            if (_point.y > (_tree.starty + _tree.endy) / 2) {
+                insertpoint(_point, _tree.children.q3);
+            } else {
+                insertpoint(_point, _tree.children.q2);
+            }
+        }
+    }
+
+}
+
+function subdivide(_tree) {
+    _tree.children.q1 = {
+        startx: (_tree.startx + _tree.endx) / 2, endx: _tree.endx,
+        starty: _tree.starty, endy: (_tree.starty + _tree.endy) / 2,
+        subdivided: false,
+        points: [],
+        children: {},
+        name: [..._tree.name, 1]
+    };
+    _tree.children.q2 = {
+        startx: _tree.startx, endx: (_tree.startx + _tree.endx) / 2,
+        starty: _tree.starty, endy: (_tree.starty + _tree.endy) / 2,
+        subdivided: false,
+        points: [],
+        children: {},
+        name: [..._tree.name, 2]
+    };
+    _tree.children.q3 = {
+        startx: _tree.startx, endx: (_tree.startx + _tree.endx) / 2,
+        starty: (_tree.starty + _tree.endy) / 2, endy: _tree.endy,
+        subdivided: false,
+        points: [],
+        children: {},
+        name: [..._tree.name, 3]
+    };
+    _tree.children.q4 = {
+        startx: (_tree.startx + _tree.endx) / 2, endx: _tree.endx,
+        starty: (_tree.starty + _tree.endy) / 2, endy: _tree.endy,
+        subdivided: false,
+        points: [],
+        children: {},
+        name: [..._tree.name, 4]
+    };
+
+    _tree.subdivided = true;
+
+    for (let _point of _tree.points) {
+        if (_point.x > (_tree.startx + _tree.endx) / 2) {
+            if (_point.y > (_tree.starty + _tree.endy)) {
+                _tree.children.q4.points.push(_point);
+            } else {
+                _tree.children.q1.points.push(_point);
+            }
+        } else {
+            if (_point.y > (_tree.starty + _tree.endy)) {
+                _tree.children.q3.points.push(_point);
+            } else {
+                _tree.children.q2.points.push(_point);
+            }
+        }
+    }
+
+    _tree.points = [];
+
+}
+
+// debugging
+let showwidth = 7;
+function showstructure(_tree, width, generation) {
+    push();
+    if (_tree.subdivided == true) {
+        stroke(255, 255, 0);
+        strokeWeight(width);
+        line((_tree.startx + _tree.endx) / 2, _tree.starty, (_tree.startx + _tree.endx) / 2, _tree.endy);
+        stroke(0, 255, 255);
+        line(_tree.startx, (_tree.starty + _tree.endy) / 2, _tree.endx, (_tree.starty + _tree.endy) / 2,);
+        stroke(255);
+        text(generation, (_tree.startx + _tree.endx) / 2, (_tree.starty + _tree.endy) / 2, (_tree.startx + _tree.endx) / 2, (_tree.starty + _tree.endy) / 2);
+    }
+    if (_tree.children.q1) {
+        showstructure(_tree.children.q1, width - 1, generation + 1);
+        showstructure(_tree.children.q2, width - 1, generation + 1);
+        showstructure(_tree.children.q3, width - 1, generation + 1);
+        showstructure(_tree.children.q4, width - 1, generation + 1);
+    }
+    pop();
+}
+function showgrid() {
+    push();
+    stroke(255, 255, 0);
+    for (let y of grid.matrix) {
+        for (let point of y) {
+            line(point.x, point.y + grid.length, point.x + grid.length, point.y + grid.length);
+            line(point.x + grid.length, point.y, point.x + grid.length, point.y + grid.length);
+        }
+    }
+    pop();
 }
