@@ -27,7 +27,7 @@ let backgroundColor = [0, 0, 0];
 let currentTextSize = 30;
 let updateNeeded = true;
 let strokeID = 0;
-let eraserCell = [0, 0];
+let eraserCell = { x: 1, y: 1 };
 
 // mode vars
 let mode = 'stroke';
@@ -387,12 +387,12 @@ function draw() {
                     let coordy = Math.floor(mouseY / grid.length);
                     let coordx = Math.floor(mouseX / grid.length);
 
-                    eraserCell = { y: coordy, x: coordx };
+                    eraserCell = { y: Math.max(coordy, 0), x: coordx };
 
                     // draw eraser UI
                     strokeWeight(1);
-                    stroke(255, 255, 255, 100);
-                    fill(255, 255, 255, 100);
+                    stroke(255, 182, 193);
+                    fill(255, 182, 193);
                     circle(mouseX, mouseY, eraserSize * 2);
                     // erase strokes
 
@@ -551,7 +551,6 @@ function draw() {
                         }
                     }
 
-
                     for (let _line of lineArr) {
                         for (let point of _line.arr) {
                             if (dist(point.x, point.y, mouseX, mouseY) < eraserSize) {
@@ -570,8 +569,8 @@ function draw() {
                 if (isFingerDown == true) {
                     // draw remove UI
                     strokeWeight(4);
-                    stroke(255, 0, 0, 150);
-                    fill(255, 0, 0, 150);
+                    stroke(255, 182, 193);
+                    fill(255, 182, 193);
                     line(mouseX - 30, mouseY - 30, mouseX + 30, mouseY + 30);
                     line(mouseX - 30, mouseY + 30, mouseX + 30, mouseY - 30);
 
@@ -614,7 +613,6 @@ function draw() {
                 }
             }
         } else {
-
             // move current image
             if (mode == 'image' && imgArr.length > 0 && imgArr[imgArr.length - 1].status == 'moving') {
                 imgArr[imgArr.length - 1].x0 = mouseX;
@@ -645,13 +643,12 @@ function draw() {
             for (let _stroke of strokeArr) {
                 showStroke(_stroke);
             }
-
             // erasing lines and strokes
             if (mode == 'erase') {
                 // draw eraser UI
                 strokeWeight(1);
-                stroke(255, 255, 255, 100);
-                fill(255, 255, 255, 100);
+                stroke(255, 182, 193);
+                fill(255, 182, 193);
                 circle(mouseX, mouseY, eraserSize * 2);
 
             }
@@ -659,19 +656,18 @@ function draw() {
                 let coordy = Math.floor(mouseY / grid.length);
                 let coordx = Math.floor(mouseX / grid.length);
 
-                eraserCell = { y: coordy, x: coordx };
+                eraserCell = { y: Math.max(coordy, 0), x: coordx };
 
                 // draw eraser UI
                 strokeWeight(1);
-                stroke(255, 255, 255, 100);
-                fill(255, 255, 255, 100);
+                stroke(255, 182, 193);
+                fill(255, 182, 193);
                 circle(mouseX, mouseY, eraserSize * 2);
-                // erase strokes
 
-                let beforexexists = eraserCell.x != 0;
-                let beforeyexists = eraserCell.y != 0;
-                let afterxexists = eraserCell.x != grid.matrix[0].length - 1;
-                let afteryexists = eraserCell.x != grid.matrix.length - 1;
+                let beforeXExists = eraserCell.x != 0;
+                let beforeYExists = eraserCell.y != 0;
+                let afterXExists = eraserCell.x != grid.matrix[0].length - 1;
+                let afterYExists = eraserCell.y != grid.matrix.length - 1;
 
                 // 0
                 for (let _point of grid.matrix[eraserCell.y][eraserCell.x].points) {
@@ -687,7 +683,7 @@ function draw() {
                         }
                     }
                 }
-                if (beforexexists == true) {
+                if (beforeXExists == true) {
                     // W
                     for (let _point of grid.matrix[eraserCell.y][eraserCell.x - 1].points) {
 
@@ -704,7 +700,7 @@ function draw() {
                         }
                     }
 
-                    if (beforeyexists == true) {
+                    if (beforeYExists == true) {
                         // n
                         for (let _point of grid.matrix[eraserCell.y - 1][eraserCell.x].points) {
 
@@ -737,7 +733,7 @@ function draw() {
                         }
                     }
 
-                    if (afteryexists == true) {
+                    if (afterYExists == true) {
                         // s
                         for (let _point of grid.matrix[eraserCell.y + 1][eraserCell.x].points) {
 
@@ -770,7 +766,7 @@ function draw() {
                         }
                     }
                 }
-                if (afterxexists == true) {
+                if (afterXExists == true) {
                     // E
                     for (let _point of grid.matrix[eraserCell.y][eraserCell.x + 1].points) {
 
@@ -787,7 +783,7 @@ function draw() {
                         }
                     }
 
-                    if (beforeyexists == true) {
+                    if (beforeYExists == true) {
                         // NE
                         for (let _point of grid.matrix[eraserCell.y - 1][eraserCell.x + 1].points) {
 
@@ -805,9 +801,10 @@ function draw() {
                         }
                     }
 
-                    if (afteryexists == true) {
+                    if (afterYExists == true) {
                         // SE
                         for (let _point of grid.matrix[eraserCell.y + 1][eraserCell.x + 1].points) {
+
                             if (dist(_point.x, _point.y, mouseX, mouseY) < eraserSize) {
                                 let _stroke = strokeArr.find(stroke => stroke.id == _point.id);
                                 if (_stroke) {
@@ -840,8 +837,8 @@ function draw() {
             else if (removeMode == true) {
                 // draw remove UI
                 strokeWeight(4);
-                stroke(255, 0, 0, 150);
-                fill(255, 0, 0, 150);
+                stroke(255, 182, 193);
+                fill(255, 182, 193);
                 line(mouseX - 30, mouseY - 30, mouseX + 30, mouseY + 30);
                 line(mouseX - 30, mouseY + 30, mouseX + 30, mouseY - 30);
 
@@ -1498,6 +1495,7 @@ function openJSON(file) {
         imgArr = newimages;
 
         updateNeeded = true;
+        populateGrid();
     }
     catch {
         window.alert("not a valid save file");
