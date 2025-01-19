@@ -41,10 +41,12 @@ The app also has a few ~~bugs~~...~~features~~...quirks 🤭. Please read [Instr
 |e|toggle between 'solid' and 'dashed' strokes|
 |a|line mode|
 |s|freehand mode|
-|d|text mode|
-|f|__eraser mode__ **|
+|d|rectangle mode|
+|f|text mode|
 |z|undo|
 |x|redo|
+|c|select mode|
+|v|__eraser mode__ **|
 
 ### ** __NOTE__ : 
 - You can also use button 1 (or whichever is mapped to right click) on the stylus to activate the eraser without having to switch to eraser mode.
@@ -67,8 +69,6 @@ The app also has a few ~~bugs~~...~~features~~...quirks 🤭. Please read [Instr
 This issue does not occur when erasing in eraser mode, as it does not require holding down the stylus button.
 
 - When drawing in freehand mode, the app may slightly flatten some curved strokes. This is due to an optimization algorithm designed to reduce the number of points in each stroke. To minimize this effect, try drawing the curve more slowly; this should help prevent the algorithm from flattening it.
-
-- Once drawn, entities (lines, text, etc.) cannot be selected, moved, recolored, or in any way modified. You can only erase them.
 
 - In text mode, there is no cursor you can move to select or edit different characters of the text, you will have to erase and retype typos.<br>
 Pressing Enter confirms you are done typing and prompts you to drag and position the text entity. To insert a new line, use Shift + Enter
