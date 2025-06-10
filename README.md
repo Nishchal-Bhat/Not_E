@@ -34,27 +34,37 @@ The app also has a few ~~bugs~~...~~features~~...quirks 🤭. Please read [Instr
 |1|switch to red|
 |2|switch to green|
 |3|switch to blue|
-|4|switch to yellow|
-|5|switch to black|
+|4|switch to black|
+|5|switch to yellow|
+|6|switch to orange|
+|7|switch to magenta|
+|8|switch to violet|
 |q|__decrease stroke, eraser, text size__ **|
 |w|increase stroke, eraser, text size|
 |e|toggle between 'solid' and 'dashed' strokes|
 |a|line mode|
 |s|freehand mode|
-|d|rectangle mode|
+|d|__rectangle mode OR duplicate__ **|
 |f|text mode|
 |z|undo|
 |x|redo|
 |c|select mode|
 |v|__eraser mode__ **|
+|b|__remove mode__ **|
+|Esc|Cancel selection or text entry|
 
 ### ** __NOTE__ : 
-- You can also use button 1 (or whichever is mapped to right click) on the stylus to activate the eraser without having to switch to eraser mode.
-
-- q and w control the size of:
+- "q" and "w" control the size of:
   - the stroke when in line or freehand mode
   - the eraser when in eraser mode
   - the text when in text mode
+
+- "d" duplicates all seleted items when in selection mode and switches to rectangle mode otherwise
+
+- You can also use button 1 (or whichever is mapped to right click) on the stylus to activate the eraser without having to switch to eraser mode.
+
+- Remove mode is for erasing text and images.
+
 
 ---
 ## The GUI
@@ -70,5 +80,4 @@ This issue does not occur when erasing in eraser mode, as it does not require ho
 
 - When drawing in freehand mode, the app may slightly flatten some curved strokes. This is due to an optimization algorithm designed to reduce the number of points in each stroke. To minimize this effect, try drawing the curve more slowly; this should help prevent the algorithm from flattening it.
 
-- In text mode, there is no cursor you can move to select or edit different characters of the text, you will have to erase and retype typos.<br>
-Pressing Enter confirms you are done typing and prompts you to drag and position the text entity. To insert a new line, use Shift + Enter
+- In text mode, pressing Enter confirms you are done typing and prompts you to drag and position the text entity. To insert a new line, use Shift + Enter

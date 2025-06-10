@@ -38,6 +38,7 @@ class note {
         this.updateNeeded = true;
         this.eraserCell = { x: 1, y: 1 };
         this.entityID = 0;
+        this.cursorOffset = 0;
 
         // mode vars
         this.mode = 'stroke';
@@ -57,16 +58,34 @@ class note {
     async addEntity(_type, _file) {
         if (_type == 'image') {
             if (_file.type === 'image') {
-                let dimensions = window.prompt(`Enter desired image width and height seperated by a space.\nFor example: 100 100 \nYour screen size is ${window.innerWidth} ${window.innerHeight} \nLeave blank for default image dimensions.`, "");
-
+                let dimensions = window.prompt(`Enter desired image width and height seperated by a space.\nFor example: 100 100 \nOr enter "." if you want to enter the other value and scale accordingly \nFor example: 100 . OR . 300  \nYour screen size is ${window.innerWidth} ${window.innerHeight} \nLeave blank for default image dimensions.`, "");
                 let imagedata = await createImg(_file.data).hide();
                 imagedata.elt.onload = () => {
+                    let enteredwidth;
+                    let enteredheight;
+
+                    if (dimensions == "") {
+                        enteredwidth = imagedata.width;
+                    } else if (dimensions.split(" ")[0] == ".") {
+                        enteredwidth = (imagedata.width / imagedata.height) * Number(dimensions.split(" ")[1]);
+                    } else {
+                        enteredwidth = Number(dimensions.split(" ")[0]);
+                    }
+
+                    if (dimensions == "") {
+                        enteredheight = imagedata.height;
+                    } else if (dimensions.split(" ")[1] == ".") {
+                        enteredheight = (imagedata.height / imagedata.width) * Number(dimensions.split(" ")[0]);
+                    } else {
+                        enteredheight = Number(dimensions.split(" ")[1]);
+                    }
+
                     let img = {
                         type: 'image',
                         id: this.entityID,
                         x0: this.mouseX, y0: this.mouseY,
-                        width: dimensions == "" ? imagedata.width : Number(dimensions.split(" ")[0]),
-                        height: dimensions == "" ? imagedata.height : Number(dimensions.split(" ")[1]),
+                        width: enteredwidth,
+                        height: enteredheight,
                         data: _file.data,
                         content: imagedata,
                         status: 'moving'
@@ -271,6 +290,8 @@ class note {
                     currententity.x0 = this.mouseX;
                     currententity.y0 = this.mouseY;
                     currententity.status = 'moving';
+
+                    this.cursorOffset = 0;
                 }
             }
             this.populateGrid();
@@ -341,7 +362,12 @@ class note {
                 fill(_entity.movingColor[0], _entity.movingColor[1], _entity.movingColor[2]);
             }
             textAlign(LEFT, TOP);
-            text(_entity.content, _entity.x0, _entity.y0);
+            if (_entity.status == 'drawing') {
+                text(insertCursor(_entity.content, _entity.content.length - this.cursorOffset), _entity.x0, _entity.y0);
+            } else {
+                text(_entity.content, _entity.x0, _entity.y0);
+            }
+
 
             // draw dotted rectangle around text
             if (_entity.status == 'drawing' || _entity.status == 'moving') {
@@ -456,18 +482,45 @@ class note {
         }
     }
 
-    finishMoving() {
+    duplicateSelections() {
+        if (this.mode == 'moving') {
+            let temparr = [];
+
+            for (let _id of this.selectedStuffArr) {
+                let entity = this.pointEntities.find(e => e.id == _id);
+                let newentity = structuredClone(entity);
+                entity.movingColor = 0;
+                newentity.id = `${entity.id}d`;
+                temparr.push(newentity.id);
+                this.pointEntities.push(newentity);
+            }
+
+            this.selectedStuffArr = [];
+
+            for (let _id of temparr) {
+                this.selectedStuffArr.push(_id);
+            }
+
+            this.undoArr.push({ type: "duplicate", ids: this.selectedStuffArr.slice() });
+            this.redoArr = [];
+        }
+    }
+
+    finishMoving(ifEscape = false) {
         for (let _id of this.selectedStuffArr) {
             let _entity = this.pointEntities.find(e => e.id == _id);
             _entity.movingColor = 0;
         }
 
-        this.undoArr.push({
-            type: 'moved', entities: this.selectedStuffArr,
-            deltaX: this.deltaX,
-            deltaY: this.deltaY
-        });
-        this.redoArr = [];
+        // only update undoArr if selection if moved and not if selection is cancelled
+        if (ifEscape == false) {
+            this.undoArr.push({
+                type: 'moved', entities: this.selectedStuffArr,
+                deltaX: this.deltaX,
+                deltaY: this.deltaY
+            });
+            this.redoArr = [];
+        }
 
         this.selectedStuffArr = [];
         this.deltaX = 0;
@@ -676,7 +729,36 @@ class note {
         }
     }
 
+    keyReleased() {
+        clearInterval(this.timeoutinterval);
+        clearInterval(this.keyinterval);
+    }
+
     keyPressed() {
+        if (key == 'ArrowLeft' || key == 'ArrowRight' || key == 'Backspace') {
+            this.timeoutinterval = setTimeout(() => {
+                this.keyinterval = setInterval(() => {
+                    if (keyIsDown(37)) {
+                        let currententity = this.pointEntities[this.pointEntities.length - 1];
+                        if (this.cursorOffset < currententity.content.length) {
+                            this.cursorOffset++;
+                        }
+                    }
+                    if (keyIsDown(39)) {
+                        if (this.cursorOffset > 0) {
+                            this.cursorOffset--;
+                        }
+                    }
+                    if (keyIsDown(8)) {
+                        let currententity = this.pointEntities[this.pointEntities.length - 1];
+                        currententity.content = deleteChar(currententity.content, currententity.content.length - this.cursorOffset - 1);
+
+                    }
+
+                }, 25);
+            }, 250);
+        }
+
         if (this.mode == 'text' && this.pointEntities.length > 0 && this.pointEntities[this.pointEntities.length - 1].status == 'drawing') {
             let currententity = this.pointEntities[this.pointEntities.length - 1];
             // ignore special keys
@@ -688,28 +770,58 @@ class note {
                 }
                 // backspace 
                 else if (key == 'Backspace') {
-                    currententity.content = currententity.content.substring(0, currententity.content.length - 1);
+                    currententity.content = deleteChar(currententity.content, currententity.content.length - this.cursorOffset - 1);
                 }
                 // finish current text 
                 else if (key == 'Enter') {
                     this.finishEntity();
+                }
+                else if (key == "ArrowLeft") {
+                    if (this.cursorOffset < currententity.content.length) {
+                        this.cursorOffset++;
+                    }
+                }
+                else if (key == "ArrowRight") {
+                    if (this.cursorOffset > 0) {
+                        this.cursorOffset--;
+                    }
+                }
+                else if (key == 'Escape') {
+                    this.pointEntities.pop();
+                    this.undoArr.pop();
                 }
             }
             // type character keys 
             else {
                 // uppercase when shift pressed
                 if (keyIsDown(16) == true) {
-                    currententity.content += `${key.toUpperCase()}`;
-                } else {
-                    currententity.content += `${key}`;
+                    currententity.content = insertChar(currententity.content, currententity.content.length - this.cursorOffset, key.toUpperCase());
+                }
+                // paste text
+                else if (keyIsDown(17) == true && key == 'v') {
+                    navigator.clipboard.readText()
+                        .then(text => {
+                            if (text) {
+                                currententity.content = insertChar(currententity.content, currententity.content.length - this.cursorOffset, text);
+
+                                // update text entity width and height
+                                textSize(this.currentTextSize);
+                                currententity.width = textWidth(currententity.content) > 100 ? textWidth(currententity.content.split('\n').reduce((a, b) => a.length > b.length ? a : b, "")) + 20 : 100;
+                                currententity.height = currententity.size * 1.25 * currententity.content.split('\n').length;
+                            }
+                        });
+                }
+                else {
+                    currententity.content = insertChar(currententity.content, currententity.content.length - this.cursorOffset, key);
                 }
             }
             // update text entity width
             textSize(this.currentTextSize);
             currententity.width = textWidth(currententity.content) > 100 ? textWidth(currententity.content.split('\n').reduce((a, b) => a.length > b.length ? a : b, "")) + 20 : 100;
+            currententity.height = currententity.size * 1.25 * currententity.content.split('\n').length;
         }
         // shortcuts 
-        else if ((this.pointEntities.length > 0 && this.pointEntities[this.pointEntities.length - 1].status != 'drawing' && this.pointEntities[this.pointEntities.length - 1].status != 'moving') || this.pointEntities.length == 0) {
+        else if (((this.pointEntities.length > 0 && this.pointEntities[this.pointEntities.length - 1].status != 'drawing' && this.pointEntities[this.pointEntities.length - 1].status != 'moving') || this.pointEntities.length == 0) && this.mode != 'moving') {
             // colors
             if (key == '`') {
                 this.currentColor = [255, 255, 255];
@@ -728,12 +840,24 @@ class note {
                 colorDisplay.value('#00aaff');
             }
             if (key == '4') {
+                this.currentColor = [0, 0, 0];
+                colorDisplay.value('#000000');
+            }
+            if (key == '5') {
                 this.currentColor = [255, 255, 0];
                 colorDisplay.value('#ffff00');
             }
-            if (key == '5') {
-                this.currentColor = [0, 0, 0];
-                colorDisplay.value('#000000');
+            if (key == "6") {
+                this.currentColor = [255, 0, 255];
+                colorDisplay.value('#FF00FF');
+            }
+            if (key == "7") {
+                this.currentColor = [255, 165, 0];
+                colorDisplay.value('#FFA500');
+            }
+            if (key == "8") {
+                this.currentColor = [138, 43, 226];
+                colorDisplay.value('#8A2BE2');
             }
             // stroke
             if (key == 'q') {
@@ -777,12 +901,12 @@ class note {
             }
             // modes
             if (key == 'a') {
-                this.mode = 'line';
-                this.currentMode = 'line';
-            }
-            if (key == 's') {
                 this.mode = 'stroke';
                 this.currentMode = 'stroke';
+            }
+            if (key == 's') {
+                this.mode = 'line';
+                this.currentMode = 'line';
             }
             if (key == 'd') {
                 this.mode = 'rect';
@@ -799,13 +923,24 @@ class note {
             if (key == 'x') {
                 this.redo();
             }
+            if (key == 'c') {
+                this.mode = this.mode == 'select' ? this.currentMode : 'select';
+                this.selectionBox = { x0: 0, y0: 0, x1: 0, y1: 0 };
+            }
             if (key == 'v') {
                 this.mode = this.mode == 'erase' ? this.currentMode : 'erase';
             }
-            if (key == 'c') {
-                this.mode = 'select';
-                this.currentMode = 'select';
+            if (key == 'b') {
+                this.mode = this.mode == 'remove' ? this.currentMode : 'remove';
+            }
+        } else if ((this.pointEntities.length > 0 && this.mode == 'moving')) {
+            if (key == 'd') {
+                this.duplicateSelections();
+            }
+            if (key == 'Escape') {
+                this.finishMoving(true);
                 this.selectionBox = { x0: 0, y0: 0, x1: 0, y1: 0 };
+                this.mode = 'select';
             }
         }
 
@@ -832,13 +967,29 @@ class note {
                     }
 
                     if (this.mode == 'text' && this.mode != 'remove') {
-                        if (this.pointEntities.length == 0) {
-                            this.addEntity('text');
-                        } else if (this.pointEntities[this.pointEntities.length - 1].status != 'moving' && this.pointEntities[this.pointEntities.length - 1].status != 'drawing') {
-                            this.addEntity('text');
-                        } else if (this.pointEntities[this.pointEntities.length - 1].status == 'drawing') {
-                            this.finishEntity();
+                        let clickedOnText = false;
+                        for (let _index in this.pointEntities) {
+                            let _entity = this.pointEntities[_index];
+                            if (_entity.type == 'text') {
+                                if (_entity.x0 < this.mouseX && this.mouseX < _entity.x1 && _entity.y0 < this.mouseY && this.mouseY < _entity.y1) {
+                                    clickedOnText = true;
+                                    moveToLast(this.pointEntities, _index);
+                                    _entity.status = 'drawing';
+                                    break;
+                                }
+                            }
                         }
+
+                        if (clickedOnText == false) {
+                            if (this.pointEntities.length == 0) {
+                                this.addEntity('text');
+                            } else if (this.pointEntities[this.pointEntities.length - 1].status != 'moving' && this.pointEntities[this.pointEntities.length - 1].status != 'drawing') {
+                                this.addEntity('text');
+                            } else if (this.pointEntities[this.pointEntities.length - 1].status == 'drawing') {
+                                this.finishEntity();
+                            }
+                        }
+
                     }
 
                     if (this.mode == 'image') {
@@ -1162,6 +1313,17 @@ class note {
                         }
                     }
                 }
+                if (activity.type == 'duplicate') {
+                    for (let _id of activity.ids) {
+                        let entity = this.pointEntities.find(e => e.id == _id);
+
+                        const index = this.pointEntities.findIndex(e => e.id === _id);
+                        if (index !== -1) {
+                            this.pointEntities.splice(index, 1);
+                        }
+                        this.erasedStuffArr.push(entity);
+                    }
+                }
             }
         }
         catch (err) {
@@ -1214,6 +1376,14 @@ class note {
                         }
                     }
                 }
+
+                if (activity.type == 'duplicate') {
+                    for (let _id of activity.ids) {
+                        let entity = this.erasedStuffArr.find(e => e.id == _id);
+                        this.erasedStuffArr.splice(this.erasedStuffArr.indexOf(entity), 1);
+                        this.pointEntities.push(entity);
+                    }
+                }
             }
         }
         catch (err) {
@@ -1253,10 +1423,16 @@ let spacing = buttonWidth / 2.5;
 
 let n = new note();
 
-// disable right click and spacebar scroll
+// disable right click and keyboard scroll
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('keydown', function (e) {
     if (e.code == 'Space' && e.target == document.body) {
+        e.preventDefault();
+    }
+    if (e.code == 'ArrowLeft' && e.target == document.body) {
+        e.preventDefault();
+    }
+    if (e.code == 'ArrowRight' && e.target == document.body) {
         e.preventDefault();
     }
 });
@@ -1311,17 +1487,19 @@ function setup() {
     });
     let colorbutton = createButton('OK').position(buttonPos(1, 0), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont / 1.5}px`).style('position : fixed');
 
-    lineModeButton = createButton('📏').position(buttonPos(2, 1), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "line mode").style('position : fixed');
-    lineModeButton.mouseClicked(() => {
-        n.isRightMouseDown = false;
-        n.mode = 'line'; n.currentMode = 'line';
-    });
-    strokeModeButton = createButton('🖊').position(buttonPos(3, 1), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "freehand mode").style('position : fixed');
+    strokeModeButton = createButton('🖊').position(buttonPos(2, 1), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "freehand mode").style('position : fixed');
     strokeModeButton.mouseClicked(() => {
         n.isRightMouseDown = false;
         n.mode = 'stroke';
         n.currentMode = 'stroke';
     });
+
+    lineModeButton = createButton('📏').position(buttonPos(3, 1), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "line mode").style('position : fixed');
+    lineModeButton.mouseClicked(() => {
+        n.isRightMouseDown = false;
+        n.mode = 'line'; n.currentMode = 'line';
+    });
+
     rectModeButton = createButton('🟥').position(buttonPos(4, 1), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "rectangle mode").style('position : fixed');
     rectModeButton.mouseClicked(() => {
         n.isRightMouseDown = false;
@@ -1341,18 +1519,18 @@ function setup() {
         input.elt.click();
     });
 
-    eraseModeButton = createButton('🧽').position(buttonPos(7, 2), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "erase mode").style('position : fixed');
+    selectModeButton = createButton('⛶').position(buttonPos(7, 2), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "select mode").style('position : fixed');
+    selectModeButton.mouseClicked(() => {
+        n.mode = n.mode == 'select' ? n.currentMode : 'select';
+    });
+    eraseModeButton = createButton('🧽').position(buttonPos(8, 2), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "erase mode").style('position : fixed');
     eraseModeButton.mouseClicked(() => {
         n.mode = n.mode == 'erase' ? n.currentMode : 'erase';
     });
-    removeModeButton = createButton('X').position(buttonPos(8, 2), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "remove text and images").style('position : fixed');
+    removeModeButton = createButton('X').position(buttonPos(9, 2), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "remove text and images").style('position : fixed');
     removeModeButton.mouseClicked(() => {
         n.mode = n.mode == 'remove' ? n.currentMode : 'remove';
         n.updateNeeded = true;
-    });
-    selectModeButton = createButton('⛶').position(buttonPos(9, 2), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "select mode").style('position : fixed');
-    selectModeButton.mouseClicked(() => {
-        n.mode = 'select';
     });
 
     let strokeMinusButton = createButton(' ⎼ ').position(buttonPos(10, 3), 0).size(buttonWidth, buttonHeight).style(`font-size:${buttonFont}px`).style('text-align : center').style(`line-height: ${buttonHeight}px`).attribute('title', "decrease stroke size").style('position : fixed');
@@ -1630,6 +1808,10 @@ function keyPressed(event) {
     n.keyPressed(event);
 }
 
+function keyReleased() {
+    n.keyReleased();
+}
+
 function mousePressed(event) {
     n.mousePressed(event);
 }
@@ -1702,6 +1884,14 @@ function openJSON(file) {
 
                 n.updateNeeded = true;
             };
+        } else {
+            resizeCanvas(json.canvassize.width, json.canvassize.height);
+            n.backgroundColor = json.backgroundColor;
+            n.pointEntities = json.pointEntities;
+            n.imageEntities = newimages;
+            n.populateGrid();
+
+            n.updateNeeded = true;
         }
     }
     catch (err) {
@@ -1710,3 +1900,33 @@ function openJSON(file) {
     }
 
 }
+
+function insertCursor(str, index) {
+    return str.slice(0, index) + "|" + str.slice(index);
+}
+
+function deleteChar(str, index) {
+    if (index > -1 && index < str.length) {
+        return str.slice(0, index) + str.slice(index + 1);
+    } else {
+        return str;
+    }
+}
+
+function insertChar(str, index, char) {
+    if (index > -1 && index <= str.length) {
+        return str.slice(0, index) + char + str.slice(index);
+    } else {
+        return str;
+    }
+}
+
+function moveToLast(arr, index) {
+    if (index < 0 || index >= arr.length) {
+        throw new RangeError("Index out of bounds");
+    }
+    const [item] = arr.splice(index, 1); // remove the item
+    arr.push(item); // push to end
+    return arr;
+}
+
